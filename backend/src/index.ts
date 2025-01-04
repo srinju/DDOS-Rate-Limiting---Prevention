@@ -1,5 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
+import cors from 'cors';
 
 //this is the backend we will be exploiting ..
 //and all the routes should be protected with ddos and rate limiting 
@@ -13,6 +14,7 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+app.use(cors());
 
 //pass these middleware of rate limiters and pass it into the routes as middlewares
 
@@ -54,8 +56,23 @@ app.post('/generate-otp', otpRateLimiter, (req,res) => {
 });
 
 //end point to reset the password >
-app.post('/reset-password' , passwordRateLimiter ,  (req,res) => {
-    const {email,otp,newPassword} = req.body;
+app.post('/reset-password' , passwordRateLimiter , async (req,res) => {
+    const {email,otp,newPassword,token} = req.body; //we will also ask the cloudflare token from the user , for checking that whetther the token is actually legit or not
+    console.log("cloudflare token is : " , token);
+
+    //now verrifiy with cloudflare whether this token is legit or not with the cloudflare secret key
+    let formData = new FormData();
+    formData.append('secret' ,"0x4AAAAAAA4lZKZTDhpnx7fyZPQRydk41mc" ); //secret key from cloudflare
+    formData.append('response' ,token ); //token with which the user is sending request
+
+    //now send the request to the cloudflare api to verify the token is legit or not >
+    const url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+    const result = await fetch(url , {
+        body : formData,
+        method : 'POST'
+    });
+    console.log("the result from the cloudflare api after sending request to the cloudflare api is : ", await result.json());
+
     if(!email || !otp || !newPassword){
         res.status(400).json({
             message : "otp , email and new password is requried here!"
